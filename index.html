@@ -10,8 +10,13 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=JetBrains+Mono&display=swap" rel="stylesheet">
     <style>
-        body { background-color: #080808; margin: 0; padding: 0; }
-        #root { min-height: 100vh; }
+        body { background-color: #080808; margin: 0; padding: 0; color: #F0F0F0; font-family: 'JetBrains Mono', monospace; }
+        #root { min-height: 100vh; padding-bottom: 80px; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #080808; }
+        ::-webkit-scrollbar-thumb { background: #2C2C2C; }
+        .tab-active { color: #BAFF29 !important; border-bottom: 2px solid #BAFF29; }
+        input, select { background: #171717 !important; border: 1px solid #2C2C2C !important; color: white !important; padding: 8px; border-radius: 4px; font-family: 'JetBrains Mono'; }
     </style>
 </head>
 <body>
@@ -20,151 +25,297 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // ── PALETTE ─────────────────────────────────────────────────────────────────
+        // ── CONFIG & PALETTE ────────────────────────────────────────────────────────
         const C = {
-            bg:    '#080808',
-            s1:    '#0F0F0F',
-            s2:    '#171717',
-            s3:    '#202020',
-            bd:    '#2C2C2C',
-            tx:    '#F0F0F0',
-            mu:    '#545454',
-            mu2:   '#888888',
-            ac:    '#BAFF29',   // acid green = money
-            acDim: 'rgba(186,255,41,0.1)',
-            da:    '#FF3E3E',
-            or:    '#FF8C00',
-            bl:    '#3D8EFF',
-            pu:    '#BB77FF',
+            bg: '#080808', s1: '#0F0F0F', s2: '#171717', bd: '#2C2C2C',
+            tx: '#F0F0F0', mu: '#545454', ac: '#BAFF29', da: '#FF3E3E',
+            bl: '#3D8EFF', or: '#FF8C00', pu: '#BB77FF',
         };
-        const FH = "'Barlow Condensed', 'Arial Narrow', sans-serif";
-        const FM = "'JetBrains Mono', 'Courier New', monospace";
 
-        // ── CONSTANTS ────────────────────────────────────────────────────────────────
-        const CAT_META = {
-            originals:   { label: 'Originals',    icon: '🎨' },
-            prints:      { label: 'Prints',       icon: '🖼️' },
-            commissions: { label: 'Commissions',  icon: '✏️' },
-            digital:     { label: 'Digital',      icon: '💻' },
-            other:       { label: 'Other',        icon: '📦' },
+        const CATS = {
+            originals: { label: 'Originals', icon: '🎨' },
+            prints:    { label: 'Prints',    icon: '🖼️' },
+            comm:      { label: 'Comms',     icon: '✏️' },
+            digital:   { label: 'Digital',   icon: '💻' },
+            books:     { label: 'Books',     icon: '📚' },
+            other:     { label: 'Other',     icon: '📦' }
         };
 
         const STAGES = [
-            { id: 'found',        label: '🔍 Found',        color: C.mu2 },
-            { id: 'contacted',    label: '📩 Contacted',    color: C.bl  },
-            { id: 'conversation', label: '💬 In Convo',     color: C.or  },
-            { id: 'negotiating',  label: '🤝 Negotiating',  color: C.pu  },
-            { id: 'confirmed',    label: '💰 Confirmed',    color: C.ac  },
-            { id: 'rejected',     label: '❌ Dead',          color: C.da  },
+            { id: 'found', label: '🔍 Found', color: '#888' },
+            { id: 'contacted', label: '📩 Sent', color: C.bl },
+            { id: 'convo', label: '💬 Talk', color: C.or },
+            { id: 'nego', label: '🤝 Nego', color: C.pu },
+            { id: 'paid', label: '💰 PAID', color: C.ac },
+            { id: 'dead', label: '❌ Dead', color: C.da }
         ];
 
-        const OPP_TYPES = ['Shop','Wall','Gallery','Event','Other'];
+        // ── HELPER FUNCTIONS ────────────────────────────────────────────────────────
+        const fmt = n => '$' + Number(n||0).toLocaleString(undefined, {minimumFractionDigits: 2});
+        const uid = () => Math.random().toString(36).substr(2, 9);
 
-        const TABS = [
-            { id: 'dashboard', label: 'Board',    icon: '⚡' },
-            { id: 'income',    label: 'Income',   icon: '💵' },
-            { id: 'roi',       label: 'ROI',      icon: '📊' },
-            { id: 'pipeline',  label: 'Pipeline', icon: '🎯' },
-        ];
-
-        // ── UTILS ────────────────────────────────────────────────────────────────────
-        const uid = () => Math.random().toString(36).slice(2, 9);
-        const today = () => new Date().toISOString().slice(0, 10);
-        const thisMonth = () => new Date().toISOString().slice(0, 7);
-        const monthLabel = () => new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-
-        const fmt = n => {
-            const v = Number(n || 0);
-            return '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        };
-        const fmtShort = n => {
-            const v = Number(n || 0);
-            if (v >= 1000) return '$' + (v / 1000).toFixed(1) + 'k';
-            return '$' + Math.round(v);
-        };
-
-        const sumBy = (arr, key) => arr.reduce((s, e) => s + Number(e[key] || 0), 0);
-        const getMonthIncome = income => income.filter(e => (e.date || '').startsWith(thisMonth()));
-        const catTotals = income => Object.keys(CAT_META).map(id => ({
-            id, label: CAT_META[id].icon + ' ' + CAT_META[id].label,
-            total: sumBy(income.filter(e => e.cat === id), 'amount'),
-        })).sort((a, b) => b.total - a.total);
-
-        // ── UI COMPONENTS ───────────────────────────────────────────────────────────
-        const Btn = ({ children, onClick, variant = 'primary', size = 'md', disabled, sx = {} }) => {
-            const [hover, setHover] = useState(false);
-            const sizes = { sm: { padding: '5px 12px', fontSize: 11 }, md: { padding: '9px 18px', fontSize: 13 } };
-            const variants = {
-                primary:   { background: hover ? '#CCFF44' : C.ac, color: '#000' },
-                secondary: { background: hover ? C.s3 : C.s2, color: C.tx, border: `1px solid ${C.bd}` },
-                ghost:     { background: 'transparent', color: hover ? C.tx : C.mu, border: `1px solid ${hover ? C.bd : '#1A1A1A'}` },
-            };
-            return (
-                <button onClick={onClick} disabled={disabled} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-                    style={{ fontFamily: FH, fontWeight: 700, textTransform: 'uppercase', cursor: disabled ? 'not-allowed' : 'pointer', border: 'none', transition: 'all 0.1s', ...sizes[size], ...variants[variant], ...sx }}
-                >{children}</button>
-            );
-        };
-
-        const Card = ({ children, sx = {} }) => (
-            <div style={{ background: C.s1, border: `1px solid ${C.bd}`, padding: 16, borderRadius: 4, ...sx }}>{children}</div>
+        // ── COMPONENTS ──────────────────────────────────────────────────────────────
+        const Card = ({ children, title, action }) => (
+            <div className="bg-[#0F0F0F] border border-[#2C2C2C] p-4 rounded mb-4">
+                <div className="flex justify-between items-center mb-3">
+                    <span className="text-[10px] font-bold text-[#545454] uppercase tracking-widest">{title}</span>
+                    {action}
+                </div>
+                {children}
+            </div>
         );
 
-        const SectionLabel = ({ children }) => (
-            <div style={{ fontFamily: FH, fontSize: 10, fontWeight: 700, color: C.mu, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>{children}</div>
-        );
-
-        // ── MAIN APP ENGINE ────────────────────────────────────────────────────────
         const ArtistIncomeEngine = () => {
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [income, setIncome] = useState([]);
-            const [artworks, setArtworks] = useState([]);
-            const [opps, setOpps] = useState([]);
-            const [monthGoal, setMonthGoal] = useState(1000);
+            const [tab, setTab] = useState('board');
+            
+            // Persisted State
+            const [income, setIncome] = useState(() => JSON.parse(localStorage.getItem('aie_income') || '[]'));
+            const [opps, setOpps] = useState(() => JSON.parse(localStorage.getItem('aie_opps') || '[]'));
+            const [inventory, setInventory] = useState(() => JSON.parse(localStorage.getItem('aie_inventory') || '[]'));
+            const [goal, setGoal] = useState(1000);
+
+            useEffect(() => {
+                localStorage.setItem('aie_income', JSON.stringify(income));
+                localStorage.setItem('aie_opps', JSON.stringify(opps));
+                localStorage.setItem('aie_inventory', JSON.stringify(inventory));
+            }, [income, opps, inventory]);
+
+            // Calculations
+            const monthlyTotal = income.reduce((acc, curr) => acc + Number(curr.amount), 0);
+            const topSources = useMemo(() => {
+                const map = {};
+                income.forEach(i => map[i.cat] = (map[i.cat] || 0) + Number(i.amount));
+                return Object.entries(map).sort((a,b) => b[1] - a[1]).slice(0, 3);
+            }, [income]);
+
+            // Handlers
+            const addIncome = (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const entry = {
+                    id: uid(),
+                    title: fd.get('title'),
+                    amount: fd.get('amount'),
+                    cat: fd.get('cat'),
+                    date: new Date().toISOString()
+                };
+                setIncome([entry, ...income]);
+                e.target.reset();
+            };
+
+            const addOpp = (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                setOpps([{
+                    id: uid(),
+                    name: fd.get('name'),
+                    type: fd.get('type'),
+                    value: fd.get('value'),
+                    stage: 'found',
+                    notes: ''
+                }, ...opps]);
+                e.target.reset();
+            };
+
+            const advanceOpp = (id) => {
+                setOpps(opps.map(o => {
+                    if (o.id !== id) return o;
+                    const idx = STAGES.findIndex(s => s.id === o.stage);
+                    const next = STAGES[idx + 1];
+                    if (next && next.id === 'paid') {
+                        // Log as income automatically if paid
+                        setIncome([{ id: uid(), title: o.name, amount: o.value, cat: 'other', date: new Date().toISOString() }, ...income]);
+                    }
+                    return next ? { ...o, stage: next.id } : o;
+                }));
+            };
 
             return (
-                <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 15px', color: C.tx }}>
-                    <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                        <div style={{ fontFamily: FH, fontSize: 24, fontWeight: 900, color: C.ac }}>ARTIST INCOME ENGINE</div>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                            {TABS.map(t => (
-                                <button key={t.id} onClick={() => setActiveTab(t.id)} 
-                                    style={{ background: 'none', border: 'none', color: activeTab === t.id ? C.ac : C.mu, cursor: 'pointer', fontFamily: FH, fontSize: 14, fontWeight: 700 }}>
-                                    {t.icon} {t.label}
-                                </button>
-                            ))}
-                        </div>
+                <div className="max-w-md mx-auto p-4">
+                    <header className="py-6">
+                        <h1 className="text-3xl font-black italic tracking-tighter text-[#BAFF29] font-['Barlow_Condensed']">INCOME ENGINE</h1>
+                        <p className="text-[10px] text-[#545454] mt-[-4px]">VERSION 1.0 // FOCUS ON THE MONEY</p>
                     </header>
 
-                    {activeTab === 'dashboard' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                            <Card>
-                                <SectionLabel>{monthLabel()} Progress</SectionLabel>
-                                <div style={{ fontSize: 40, fontFamily: FH, fontWeight: 900, color: C.ac }}>{fmt(sumBy(getMonthIncome(income), 'amount'))}</div>
-                                <div style={{ fontSize: 12, color: C.mu, fontFamily: FM }}>Goal: {fmt(monthGoal)}</div>
-                                <div style={{ background: C.s3, height: 8, marginTop: 10, borderRadius: 4 }}>
-                                    <div style={{ width: `${Math.min((sumBy(getMonthIncome(income), 'amount') / monthGoal) * 100, 100)}%`, background: C.ac, height: '100%', borderRadius: 4 }} />
+                    {/* DASHBOARD TAB */}
+                    {tab === 'board' && (
+                        <div className="animate-in fade-in duration-500">
+                            <Card title="Monthly Progress">
+                                <div className="text-5xl font-black font-['Barlow_Condensed'] text-[#BAFF29]">{fmt(monthlyTotal)}</div>
+                                <div className="flex justify-between text-[11px] text-[#888] mt-2 mb-1">
+                                    <span>GOAL: {fmt(goal)}</span>
+                                    <span>{Math.round((monthlyTotal/goal)*100)}%</span>
+                                </div>
+                                <div className="w-full bg-[#171717] h-2 rounded-full overflow-hidden">
+                                    <div className="bg-[#BAFF29] h-full transition-all duration-1000" style={{ width: `${Math.min((monthlyTotal/goal)*100, 100)}%` }}></div>
                                 </div>
                             </Card>
-                            <Card>
-                                <SectionLabel>Quick Tip</SectionLabel>
-                                <p style={{ fontFamily: FM, fontSize: 13, color: C.mu2 }}>Consistent leads = Consistent cash. Update your pipeline daily.</p>
+
+                            <Card title="What's Making Money?">
+                                {topSources.length > 0 ? topSources.map(([cat, val]) => (
+                                    <div key={cat} className="flex justify-between items-center py-2 border-b border-[#171717]">
+                                        <span className="text-sm uppercase font-bold text-[#F0F0F0]">{CATS[cat]?.icon} {CATS[cat]?.label}</span>
+                                        <span className="text-sm font-mono text-[#BAFF29]">{fmt(val)}</span>
+                                    </div>
+                                )) : <p className="text-[#545454] text-xs italic">No data logged yet.</p>}
+                            </Card>
+
+                            <Card title="Daily Actions">
+                                <div className="space-y-3">
+                                    <div className="flex gap-3 items-center text-xs text-[#888] bg-[#171717] p-3 rounded">
+                                        <span className="text-[#BAFF29]">▶</span>
+                                        <span>Add 2 new local shop leads to Pipeline.</span>
+                                    </div>
+                                    <div className="flex gap-3 items-center text-xs text-[#888] bg-[#171717] p-3 rounded">
+                                        <span className="text-[#BAFF29]">▶</span>
+                                        <span>Follow up with any "Sent" status leads.</span>
+                                    </div>
+                                </div>
                             </Card>
                         </div>
                     )}
 
-                    {activeTab !== 'dashboard' && (
-                        <Card>
-                            <SectionLabel>{activeTab} Module</SectionLabel>
-                            <p style={{ fontFamily: FM, fontSize: 13, color: C.mu2 }}>Module data loading... Add entries in the code to expand.</p>
-                            <Btn onClick={() => setActiveTab('dashboard')} variant="secondary">Back to Board</Btn>
-                        </Card>
+                    {/* INCOME LOG TAB */}
+                    {tab === 'income' && (
+                        <div className="animate-in slide-in-from-bottom-4">
+                            <Card title="Add Income">
+                                <form onSubmit={addIncome} className="flex flex-col gap-2">
+                                    <input name="title" placeholder="Item Name / Sale Title" required />
+                                    <div className="flex gap-2">
+                                        <input name="amount" type="number" placeholder="$ Amount" className="flex-1" required />
+                                        <select name="cat" className="flex-1">
+                                            {Object.entries(CATS).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
+                                        </select>
+                                    </div>
+                                    <button className="bg-[#BAFF29] text-black font-black p-2 rounded mt-2 uppercase text-xs">Log Sale +</button>
+                                </form>
+                            </Card>
+                            <SectionLabel>History</SectionLabel>
+                            {income.map(i => (
+                                <div key={i.id} className="flex justify-between bg-[#171717] p-3 rounded mb-2 border-l-2 border-[#BAFF29]">
+                                    <div>
+                                        <div className="text-sm font-bold">{i.title}</div>
+                                        <div className="text-[10px] text-[#545454] uppercase">{CATS[i.cat]?.label}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-sm font-mono text-[#BAFF29]">{fmt(i.amount)}</div>
+                                        <button onClick={() => setIncome(income.filter(x => x.id !== i.id))} className="text-[10px] text-red-500 uppercase">Delete</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
+
+                    {/* PIPELINE TAB */}
+                    {tab === 'pipeline' && (
+                        <div>
+                            <Card title="New Opportunity">
+                                <form onSubmit={addOpp} className="flex flex-col gap-2">
+                                    <input name="name" placeholder="Shop/Wall/Gallery Name" required />
+                                    <div className="flex gap-2">
+                                        <input name="value" type="number" placeholder="Est. Value $" className="flex-1" required />
+                                        <select name="type" className="flex-1">
+                                            <option>Shop</option>
+                                            <option>Wall</option>
+                                            <option>Gallery</option>
+                                            <option>Event</option>
+                                        </select>
+                                    </div>
+                                    <button className="bg-[#3D8EFF] text-white font-black p-2 rounded mt-2 uppercase text-xs">Add Lead +</button>
+                                </form>
+                            </Card>
+                            {opps.filter(o => o.stage !== 'dead').map(o => {
+                                const stageInfo = STAGES.find(s => s.id === o.stage);
+                                return (
+                                    <div key={o.id} className="bg-[#0F0F0F] border border-[#2C2C2C] p-4 rounded mb-2">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase" style={{ backgroundColor: stageInfo.color, color: '#000' }}>{stageInfo.label}</span>
+                                            <span className="font-mono text-[#BAFF29]">{fmt(o.value)}</span>
+                                        </div>
+                                        <h3 className="font-bold text-lg mb-4">{o.name}</h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => advanceOpp(o.id)} className="flex-1 bg-[#2C2C2C] text-white p-2 rounded text-[10px] font-bold uppercase">Advance Stage →</button>
+                                            <button onClick={() => setOpps(opps.map(x => x.id === o.id ? {...x, stage: 'dead'} : x))} className="bg-[#171717] text-red-500 p-2 rounded text-[10px] font-bold px-4">X</button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* ROI ANALYTICS TAB */}
+                    {tab === 'roi' && (
+                        <div>
+                            <Card title="Add New Production">
+                                <form onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const fd = new FormData(e.target);
+                                    setInventory([{
+                                        id: uid(),
+                                        name: fd.get('name'),
+                                        hours: fd.get('hours'),
+                                        cost: fd.get('cost'),
+                                        price: fd.get('price')
+                                    }, ...inventory]);
+                                    e.target.reset();
+                                }} className="flex flex-col gap-2">
+                                    <input name="name" placeholder="Artwork/Project Title" required />
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <input name="hours" type="number" placeholder="Hours" required />
+                                        <input name="cost" type="number" placeholder="Cost $" required />
+                                        <input name="price" type="number" placeholder="Sale $" required />
+                                    </div>
+                                    <button className="bg-white text-black font-black p-2 rounded mt-2 uppercase text-xs">Calculate ROI +</button>
+                                </form>
+                            </Card>
+                            <SectionLabel>Profitability Rank (Hourly Rate)</SectionLabel>
+                            {inventory.map(item => {
+                                const profit = item.price - item.cost;
+                                const ehr = profit / item.hours;
+                                return (
+                                    <div key={item.id} className="bg-[#171717] p-3 rounded mb-2 flex justify-between items-center">
+                                        <div className="w-1/2">
+                                            <div className="text-sm font-bold truncate">{item.name}</div>
+                                            <div className="text-[10px] text-[#545454] uppercase">{item.hours}H WORK // {fmt(item.cost)} MATS</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className={`text-sm font-black ${ehr > 50 ? 'text-[#BAFF29]' : ehr > 20 ? 'text-white' : 'text-red-500'}`}>
+                                                {fmt(ehr)}/HR
+                                            </div>
+                                            <button onClick={() => setInventory(inventory.filter(x => x.id !== item.id))} className="text-[10px] text-[#545454] uppercase">Remove</button>
+                                        </div>
+                                    </div>
+                                );
+                            }).sort((a,b) => {
+                                const ehrA = (a.props.children[1].props.children[0].props.children[0].replace(/[^0-9.-]+/g,""));
+                                const ehrB = (b.props.children[1].props.children[0].props.children[0].replace(/[^0-9.-]+/g,""));
+                                return ehrB - ehrA;
+                            })}
+                        </div>
+                    )}
+
+                    {/* NAVIGATION */}
+                    <nav className="fixed bottom-0 left-0 right-0 bg-[#0F0F0F] border-t border-[#2C2C2C] flex justify-around py-3 z-50">
+                        <NavBtn icon="⚡" label="Board" active={tab === 'board'} onClick={() => setTab('board')} />
+                        <NavBtn icon="💵" label="Income" active={tab === 'income'} onClick={() => setTab('income')} />
+                        <NavBtn icon="🎯" label="Pipeline" active={tab === 'pipeline'} onClick={() => setTab('pipeline')} />
+                        <NavBtn icon="📊" label="ROI" active={tab === 'roi'} onClick={() => setTab('roi')} />
+                    </nav>
                 </div>
             );
         };
 
-        // ── RENDER ──────────────────────────────────────────────────────────────────
+        const NavBtn = ({ icon, label, active, onClick }) => (
+            <button onClick={onClick} className={`flex flex-col items-center gap-1 ${active ? 'text-[#BAFF29]' : 'text-[#545454]'}`}>
+                <span className="text-xl">{icon}</span>
+                <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+            </button>
+        );
+
+        const SectionLabel = ({ children }) => (
+            <div className="text-[10px] font-bold text-[#545454] uppercase tracking-widest mb-3 mt-6">{children}</div>
+        );
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ArtistIncomeEngine />);
     </script>
