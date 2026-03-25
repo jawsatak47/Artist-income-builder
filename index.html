@@ -1,11 +1,38 @@
-<script type="text/babel">
-        // This will find the app whether you named it ArtistIncomeEngine or App
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        if (typeof ArtistIncomeEngine !== 'undefined') {
-            root.render(<ArtistIncomeEngine />);
-        } else if (typeof App !== 'undefined') {
-            root.render(<App />);
-        } else {
-            console.error("Could not find a component named ArtistIncomeEngine or App.");
-        }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artist Income Engine</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <div id="root"></div>
+
+    <script type="text/babel" src="./artist_income_engine.jsx"></script>
+
+    <script type="text/babel">
+        // This waits for the file above to load before trying to display it
+        window.onload = () => {
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            
+            // Check for the most likely component names
+            if (typeof ArtistIncomeEngine !== 'undefined') {
+                root.render(<ArtistIncomeEngine />);
+            } else if (typeof App !== 'undefined') {
+                root.render(<App />);
+            } else {
+                document.getElementById('root').innerHTML = `
+                    <div style="padding: 20px; color: red; font-family: sans-serif;">
+                        <h1>Error: Component Not Found</h1>
+                        <p>The code in <b>artist_income_engine.jsx</b> needs to start with:</p>
+                        <code>const ArtistIncomeEngine = () => {</code>
+                    </div>`;
+            }
+        };
     </script>
+</body>
+</html>
