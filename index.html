@@ -1,19 +1,16 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Artist Income Engine</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="text/babel" src="artistincomeengine.jsx"></script>
-    <script type="text/babel">
-        // This tells the browser to actually start the app
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<ArtistIncomeEngine />);
+<script type="text/babel">
+        // This part finds your app no matter what you named it
+        try {
+            const AppToRender = typeof ArtistIncomeEngine !== 'undefined' ? ArtistIncomeEngine : App;
+            const root = ReactDOM.createRoot(document.getElementById('root'));
+            root.render(<AppToRender />);
+        } catch (err) {
+            document.getElementById('root').innerHTML = `<div style="color: red; padding: 20px;">
+                <h2>Error Loading Engine</h2>
+                <p>${err.message}</p>
+                <p>Check if your .jsx file is named correctly in the script tag.</p>
+            </div>`;
+        }
     </script>
 </body>
 </html>
