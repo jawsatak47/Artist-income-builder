@@ -3,170 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Artist Income Engine</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <title>CANVAS WARS | Creative Platform</title>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js" crossorigin></script>
+
     <style>
-        body { background-color: #080808; margin: 0; padding: 0; }
-        #root { min-height: 100vh; }
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
+        
+        :root {
+            --bg: #060608; --s1: #0e0e12; --s2: #16161c; --bdr: #252530;
+            --red: #FF2600; --ora: #FF7A00; --blu: #00CFFF; --wht: #F0EDE8; --mut: #52526a;
+        }
+
+        body { 
+            background: var(--bg); 
+            color: var(--wht); 
+            font-family: 'Barlow Condensed', sans-serif; 
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* Noise effect for that "Resident Artist" aesthetic */
+        .noise::after {
+            content: ''; position: fixed; inset: 0; z-index: 999; pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+        }
+
+        .nav { 
+            height: 60px; background: rgba(14,14,18,0.95); display: flex; 
+            align-items: center; justify-content: space-between; padding: 0 20px;
+            border-bottom: 1px solid var(--bdr); position: sticky; top: 0; z-index: 100;
+        }
+
+        .logo { 
+            font-family: 'Bebas Neue', cursive; font-size: 32px; letter-spacing: 4px;
+            background: linear-gradient(90deg, var(--red), var(--ora));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        .hero { text-align: center; padding: 80px 20px; }
+        .hero-title { font-family: 'Bebas Neue'; font-size: 80px; line-height: 0.8; margin-bottom: 20px; color: var(--red); }
+        
+        .vote-card { 
+            background: var(--s1); border: 1px solid var(--bdr); border-radius: 12px; 
+            padding: 24px; transition: 0.3s; cursor: pointer;
+        }
+        .vote-card:hover { border-color: var(--red); transform: translateY(-5px); }
+        
+        .btn-red { 
+            background: var(--red); color: white; border: none; padding: 12px 30px; 
+            font-family: 'Bebas Neue'; font-size: 20px; cursor: pointer; border-radius: 4px;
+        }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="noise">
+    <div id="root">
+        <div style="height:100vh; display:flex; align-items:center; justify-content:center; flex-direction:column;">
+            <h1 style="font-family:sans-serif; color:#FF2600;">CANVAS WARS</h1>
+            <p style="color:#52526a;">Initializing Battle Engine...</p>
+        </div>
+    </div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect } = React;
 
-        // ── PALETTE ─────────────────────────────────────────────────────────────────
-        const C = {
-            bg:    '#080808',
-            s1:    '#0F0F0F',
-            s2:    '#171717',
-            s3:    '#202020',
-            bd:    '#2C2C2C',
-            tx:    '#F0F0F0',
-            mu:    '#545454',
-            mu2:   '#888888',
-            ac:    '#BAFF29',   // acid green = money
-            acDim: 'rgba(186,255,41,0.1)',
-            da:    '#FF3E3E',
-            or:    '#FF8C00',
-            bl:    '#3D8EFF',
-            pu:    '#BB77FF',
-        };
-        const FH = "'Barlow Condensed', 'Arial Narrow', sans-serif";
-        const FM = "'JetBrains Mono', 'Courier New', monospace";
+        function CanvasWars() {
+            const [view, setView] = useState('home');
+            const [votes, setVotes] = useState({ artistA: 64, artistB: 36 });
 
-        // ── CONSTANTS ────────────────────────────────────────────────────────────────
-        const CAT_META = {
-            originals:   { label: 'Originals',    icon: '🎨' },
-            prints:      { label: 'Prints',       icon: '🖼️' },
-            commissions: { label: 'Commissions',  icon: '✏️' },
-            digital:     { label: 'Digital',      icon: '💻' },
-            other:       { label: 'Other',        icon: '📦' },
-        };
-
-        const STAGES = [
-            { id: 'found',        label: '🔍 Found',        color: C.mu2 },
-            { id: 'contacted',    label: '📩 Contacted',    color: C.bl  },
-            { id: 'conversation', label: '💬 In Convo',     color: C.or  },
-            { id: 'negotiating',  label: '🤝 Negotiating',  color: C.pu  },
-            { id: 'confirmed',    label: '💰 Confirmed',    color: C.ac  },
-            { id: 'rejected',     label: '❌ Dead',          color: C.da  },
-        ];
-
-        const OPP_TYPES = ['Shop','Wall','Gallery','Event','Other'];
-
-        const TABS = [
-            { id: 'dashboard', label: 'Board',    icon: '⚡' },
-            { id: 'income',    label: 'Income',   icon: '💵' },
-            { id: 'roi',       label: 'ROI',      icon: '📊' },
-            { id: 'pipeline',  label: 'Pipeline', icon: '🎯' },
-        ];
-
-        // ── UTILS ────────────────────────────────────────────────────────────────────
-        const uid = () => Math.random().toString(36).slice(2, 9);
-        const today = () => new Date().toISOString().slice(0, 10);
-        const thisMonth = () => new Date().toISOString().slice(0, 7);
-        const monthLabel = () => new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-
-        const fmt = n => {
-            const v = Number(n || 0);
-            return '$' + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-        };
-        const fmtShort = n => {
-            const v = Number(n || 0);
-            if (v >= 1000) return '$' + (v / 1000).toFixed(1) + 'k';
-            return '$' + Math.round(v);
-        };
-
-        const sumBy = (arr, key) => arr.reduce((s, e) => s + Number(e[key] || 0), 0);
-        const getMonthIncome = income => income.filter(e => (e.date || '').startsWith(thisMonth()));
-        const catTotals = income => Object.keys(CAT_META).map(id => ({
-            id, label: CAT_META[id].icon + ' ' + CAT_META[id].label,
-            total: sumBy(income.filter(e => e.cat === id), 'amount'),
-        })).sort((a, b) => b.total - a.total);
-
-        // ── UI COMPONENTS ───────────────────────────────────────────────────────────
-        const Btn = ({ children, onClick, variant = 'primary', size = 'md', disabled, sx = {} }) => {
-            const [hover, setHover] = useState(false);
-            const sizes = { sm: { padding: '5px 12px', fontSize: 11 }, md: { padding: '9px 18px', fontSize: 13 } };
-            const variants = {
-                primary:   { background: hover ? '#CCFF44' : C.ac, color: '#000' },
-                secondary: { background: hover ? C.s3 : C.s2, color: C.tx, border: `1px solid ${C.bd}` },
-                ghost:     { background: 'transparent', color: hover ? C.tx : C.mu, border: `1px solid ${hover ? C.bd : '#1A1A1A'}` },
+            const handleVote = (id) => {
+                setVotes(prev => ({
+                    ...prev,
+                    [id]: prev[id] + 1
+                }));
             };
-            return (
-                <button onClick={onClick} disabled={disabled} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-                    style={{ fontFamily: FH, fontWeight: 700, textTransform: 'uppercase', cursor: disabled ? 'not-allowed' : 'pointer', border: 'none', transition: 'all 0.1s', ...sizes[size], ...variants[variant], ...sx }}
-                >{children}</button>
-            );
-        };
-
-        const Card = ({ children, sx = {} }) => (
-            <div style={{ background: C.s1, border: `1px solid ${C.bd}`, padding: 16, borderRadius: 4, ...sx }}>{children}</div>
-        );
-
-        const SectionLabel = ({ children }) => (
-            <div style={{ fontFamily: FH, fontSize: 10, fontWeight: 700, color: C.mu, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 10 }}>{children}</div>
-        );
-
-        // ── MAIN APP ENGINE ────────────────────────────────────────────────────────
-        const ArtistIncomeEngine = () => {
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [income, setIncome] = useState([]);
-            const [artworks, setArtworks] = useState([]);
-            const [opps, setOpps] = useState([]);
-            const [monthGoal, setMonthGoal] = useState(1000);
 
             return (
-                <div style={{ maxWidth: 600, margin: '0 auto', padding: '20px 15px', color: C.tx }}>
-                    <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-                        <div style={{ fontFamily: FH, fontSize: 24, fontWeight: 900, color: C.ac }}>ARTIST INCOME ENGINE</div>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                            {TABS.map(t => (
-                                <button key={t.id} onClick={() => setActiveTab(t.id)} 
-                                    style={{ background: 'none', border: 'none', color: activeTab === t.id ? C.ac : C.mu, cursor: 'pointer', fontFamily: FH, fontSize: 14, fontWeight: 700 }}>
-                                    {t.icon} {t.label}
-                                </button>
-                            ))}
+                <div>
+                    <nav className="nav">
+                        <div className="logo">CANVAS WARS</div>
+                        <div style={{display:'flex', gap:'20px'}}>
+                            <span onClick={() => setView('home')} style={{cursor:'pointer', fontFamily:'Bebas Neue'}}>HOME</span>
+                            <span onClick={() => setView('live')} style={{cursor:'pointer', fontFamily:'Bebas Neue', color:'var(--red)'}}>LIVE ARENA</span>
                         </div>
-                    </header>
+                    </nav>
 
-                    {activeTab === 'dashboard' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 15 }}>
-                            <Card>
-                                <SectionLabel>{monthLabel()} Progress</SectionLabel>
-                                <div style={{ fontSize: 40, fontFamily: FH, fontWeight: 900, color: C.ac }}>{fmt(sumBy(getMonthIncome(income), 'amount'))}</div>
-                                <div style={{ fontSize: 12, color: C.mu, fontFamily: FM }}>Goal: {fmt(monthGoal)}</div>
-                                <div style={{ background: C.s3, height: 8, marginTop: 10, borderRadius: 4 }}>
-                                    <div style={{ width: `${Math.min((sumBy(getMonthIncome(income), 'amount') / monthGoal) * 100, 100)}%`, background: C.ac, height: '100%', borderRadius: 4 }} />
+                    <div style={{maxWidth:'1100px', margin:'0 auto', padding:'20px'}}>
+                        {view === 'home' ? (
+                            <div className="hero">
+                                <h1 className="hero-title">CREATIVE<br/>COMBAT</h1>
+                                <p style={{fontFamily:'IBM Plex Mono', color:'var(--mut)', marginBottom:'40px'}}>SOUTHERN OREGON | SUMMER 2026</p>
+                                <button className="btn-red" onClick={() => setView('live')}>ENTER THE ARENA</button>
+                            </div>
+                        ) : (
+                            <div style={{marginTop:'40px'}}>
+                                <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'30px'}}>
+                                    <div style={{width:'10px', height:'10px', borderRadius:'50%', background:'var(--red)', animation:'pulse 1s infinite'}}></div>
+                                    <span style={{fontFamily:'IBM Plex Mono', fontSize:'12px'}}>LIVE EVENT: LIVE AUDIENCE VOTING OPEN</span>
                                 </div>
-                            </Card>
-                            <Card>
-                                <SectionLabel>Quick Tip</SectionLabel>
-                                <p style={{ fontFamily: FM, fontSize: 13, color: C.mu2 }}>Consistent leads = Consistent cash. Update your pipeline daily.</p>
-                            </Card>
-                        </div>
-                    )}
 
-                    {activeTab !== 'dashboard' && (
-                        <Card>
-                            <SectionLabel>{activeTab} Module</SectionLabel>
-                            <p style={{ fontFamily: FM, fontSize: 13, color: C.mu2 }}>Module data loading... Add entries in the code to expand.</p>
-                            <Btn onClick={() => setActiveTab('dashboard')} variant="secondary">Back to Board</Btn>
-                        </Card>
-                    )}
+                                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'20px'}}>
+                                    <div className="vote-card" onClick={() => handleVote('artistA')}>
+                                        <h2 style={{fontFamily:'Bebas Neue', fontSize:'32px'}}>ARTIST 01</h2>
+                                        <div style={{height:'8px', background:'var(--s2)', borderRadius:'4px', margin:'15px 0'}}>
+                                            <div style={{height:'100%', background:'var(--blu)', width:`${(votes.artistA / (votes.artistA + votes.artistB)) * 100}%`, transition:'0.5s', borderRadius:'4px'}}></div>
+                                        </div>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontFamily:'IBM Plex Mono', fontSize:'14px'}}>
+                                            <span>THE PHANTOM</span>
+                                            <span style={{color:'var(--blu)'}}>{Math.round((votes.artistA / (votes.artistA + votes.artistB)) * 100)}%</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="vote-card" onClick={() => handleVote('artistB')}>
+                                        <h2 style={{fontFamily:'Bebas Neue', fontSize:'32px'}}>ARTIST 02</h2>
+                                        <div style={{height:'8px', background:'var(--s2)', borderRadius:'4px', margin:'15px 0'}}>
+                                            <div style={{height:'100%', background:'var(--red)', width:`${(votes.artistB / (votes.artistA + votes.artistB)) * 100}%`, transition:'0.5s', borderRadius:'4px'}}></div>
+                                        </div>
+                                        <div style={{display:'flex', justifyContent:'space-between', fontFamily:'IBM Plex Mono', fontSize:'14px'}}>
+                                            <span>VANDAL QUEEN</span>
+                                            <span style={{color:'var(--red)'}}>{Math.round((votes.artistB / (votes.artistA + votes.artistB)) * 100)}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p style={{textAlign:'center', marginTop:'40px', color:'var(--mut)', fontSize:'12px', fontFamily:'IBM Plex Mono'}}>TAP CARD TO CAST VOTE</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             );
-        };
+        }
 
-        // ── RENDER ──────────────────────────────────────────────────────────────────
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<ArtistIncomeEngine />);
+        root.render(<CanvasWars />);
     </script>
 </body>
 </html>
