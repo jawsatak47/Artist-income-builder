@@ -1,16 +1,11 @@
 <script type="text/babel">
-        // This part finds your app no matter what you named it
-        try {
-            const AppToRender = typeof ArtistIncomeEngine !== 'undefined' ? ArtistIncomeEngine : App;
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<AppToRender />);
-        } catch (err) {
-            document.getElementById('root').innerHTML = `<div style="color: red; padding: 20px;">
-                <h2>Error Loading Engine</h2>
-                <p>${err.message}</p>
-                <p>Check if your .jsx file is named correctly in the script tag.</p>
-            </div>`;
+        // This will find the app whether you named it ArtistIncomeEngine or App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        if (typeof ArtistIncomeEngine !== 'undefined') {
+            root.render(<ArtistIncomeEngine />);
+        } else if (typeof App !== 'undefined') {
+            root.render(<App />);
+        } else {
+            console.error("Could not find a component named ArtistIncomeEngine or App.");
         }
     </script>
-</body>
-</html>
